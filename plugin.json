@@ -1,0 +1,48 @@
+{
+    "label": {
+        "de": "Pilipay",
+        "en": "Pilipay"
+    },
+
+    "copyright": "(c) PILIBABA INTERNATIONAL CO.,LTD. (http://www.pilibaba.com)",
+    "license": "MIT",
+    "link": "http://www.pilibaba.com",
+    "author": "PILIBABA INTERNATIONAL CO.,LTD. info@pilibaba.com",
+    "currentVersion": "1.0.18",
+
+    "changelog": {
+        "de": {
+            "1.0.18": "fix a bug about request param",
+            "1.0.17": "fix warehouse list error",
+	        "1.0.11": "find shipping via name",
+            "1.0.10": "fix order bugs",
+            "1.0.9": "Add warehouse's details",
+            "1.0.8": "Fix HTTPS' issues.",
+            "1.0.7": "Requires customer login before express checkout",
+            "1.0.6": "Use Https, update warehouses address",
+            "1.0.5": "Use Https, update warehouses address",
+            "1.0.4": "Save Warehouses address to order",
+            "1.0.0": "Erste Version"
+        },
+        "en": {
+            "1.0.18": "fix a bug about request param",
+            "1.0.17": "fix warehouse list error",
+	        "1.0.11": "find shipping via name",
+            "1.0.10": "fix order bugs",
+            "1.0.9": "Add warehouse's details",
+            "1.0.8": "Fix HTTPS' issues.",
+            "1.0.7": "Requires customer login before express checkout",
+            "1.0.6": "Use Https, update warehouses address",
+            "1.0.5": "Use Https, update warehouses address",
+            "1.0.4": "Save Warehouses address to order",
+            "1.0.0": "First version"
+        }
+    },
+
+    "compatibility": {
+        "minimumVersion": "5.1.1",
+        "maximumVersion": null,
+        "blacklist": [
+        ]
+    }
+}

@@ -1,0 +1,8 @@
+<h1>PilipaySystem</h1>
+<br />
+<p>A Pilipay plugin for shopware</p>
+<br />
+<h2>License</h2>
+<br />
+<p>The MIT License (MIT). Please see [License File](LICENSE) for more information.</p>
+<br />
