@@ -6,7 +6,8 @@
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
  */
-class Shopware_Components_Pilipay_Client extends Zend_Http_Client {
+class Shopware_Components_Pilipay_Client extends Zend_Http_Client
+{
 
     /**
      * Update of the track number url
@@ -38,7 +39,8 @@ class Shopware_Components_Pilipay_Client extends Zend_Http_Client {
      *
      * @param Enlight_Config $config
      */
-    public function __construct($config) {
+    public function __construct($config)
+    {
         $this->pluginConfig = $config;
         parent::__construct($this->getBaseUri());
         $this->setAdapter(self::createAdapterFromConfig($config));
@@ -46,20 +48,22 @@ class Shopware_Components_Pilipay_Client extends Zend_Http_Client {
 
     /**
      * @param Enlight_Config $config
+     *
      * @return Zend_Http_Client_Adapter_Curl|Zend_Http_Client_Adapter_Socket
      */
-    public static function createAdapterFromConfig($config) {
+    public static function createAdapterFromConfig($config)
+    {
 
-        $curl = true;
+        $curl       = true;
         $sslVersion = 0;
-        $timeout = 60;
-        $userAgent = 'Shopware/' . Shopware::VERSION;
+        $timeout    = 60;
+        $userAgent  = 'Shopware/' . Shopware::VERSION;
 
         if ($curl && extension_loaded('curl')) {
             $adapter = new Zend_Http_Client_Adapter_Curl();
             $adapter->setConfig(array(
                 'useragent' => $userAgent,
-                'timeout' => $timeout,
+                'timeout'   => $timeout,
             ));
 
             $adapter->setCurlOption(CURLOPT_TIMEOUT, $timeout);
@@ -71,29 +75,36 @@ class Shopware_Components_Pilipay_Client extends Zend_Http_Client {
         } else {
             $adapter = new Zend_Http_Client_Adapter_Socket();
             $adapter->setConfig(array(
-                'useragent' => $userAgent,
-                'timeout' => $timeout,
+                'useragent'    => $userAgent,
+                'timeout'      => $timeout,
                 'ssltransport' => ($sslVersion > 3 || $sslVersion == 1) ? 'tls' : 'ssl',
             ));
         }
+
         return $adapter;
     }
 
-    public function getBaseUri() {
+    public function getBaseUri()
+    {
         return self::URL_LIVE;
     }
 
-    public function create($uri, $params) {
+    public function create($uri, $params)
+    {
         $this->setRawData(json_encode($params), 'application/json');
+
         return $this->post($uri);
     }
 
-    public function update($uri, $params) {
+    public function update($uri, $params)
+    {
         $this->setRawData(json_encode($params), 'application/json');
+
         return $this->put($uri);
     }
 
-    public function request($method = null, $uri = null, $params = null) {
+    public function request($method = null, $uri = null, $params = null)
+    {
         if ($method !== null) {
             $this->setMethod($method);
         }
@@ -114,30 +125,35 @@ class Shopware_Components_Pilipay_Client extends Zend_Http_Client {
             }
         }
         $response = parent::request();
+
         return $this->filterResponse($response);
     }
 
-    private function filterResponse($response) {
+    private function filterResponse($response)
+    {
         $body = $response->getBody();
 
-        $data = array();
-        $data['status'] = $response->getStatus();
+        $data            = array();
+        $data['status']  = $response->getStatus();
         $data['message'] = $response->getMessage();
 
         if (strpos($response->getHeader('content-type'), 'application/json') === 0) {
             $body = json_decode($body, true);
         }
-        if (!is_array($body)) {
+        if ( ! is_array($body)) {
             $body = array('body' => $body);
         }
+
         return $data + $body;
     }
 
-    public function get($uri = null, $params = null) {
+    public function get($uri = null, $params = null)
+    {
         return $this->request(self::GET, $uri, $params);
     }
 
-    public function post($uri = null, $params = null) {
+    public function post($uri = null, $params = null)
+    {
         return $this->request(self::POST, $uri, $params);
     }
 
