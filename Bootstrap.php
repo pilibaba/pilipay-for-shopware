@@ -27,7 +27,7 @@ class Shopware_Plugins_Frontend_PilibabaPilipaySystem_Bootstrap extends Shopware
 
         $compatibility = $this->getPluginInformationValue('compatibility', array());
         if (isset($compatibility['minimumVersion'])) {
-            if (!$this->assertVersionGreaterThen($compatibility['minimumVersion'])) {
+            if ( ! $this->assertMinimumVersion($compatibility['minimumVersion'])) {
                 return array(
                     'success' => false,
                     'message' => 'The Pilipay System plugin requires min. shopware ' . $compatibility['minimumVersion']
@@ -45,10 +45,8 @@ class Shopware_Plugins_Frontend_PilibabaPilipaySystem_Bootstrap extends Shopware
         $this->createNewDispatch();
         $this->updateSchema();
 
-//        $this->Plugin()->setActive(true);
-
         return array(
-            'success' => true,
+            'success'         => true,
             'invalidateCache' => array('config', 'backend', 'proxy', 'template', 'theme')
         );
     }
@@ -58,7 +56,7 @@ class Shopware_Plugins_Frontend_PilibabaPilipaySystem_Bootstrap extends Shopware
     {
         $this->registerCustomModels();
 
-        $em = $this->Application()->Models();
+        $em   = $this->Application()->Models();
         $tool = new \Doctrine\ORM\Tools\SchemaTool($em);
 
         $classes = array(
@@ -87,72 +85,96 @@ class Shopware_Plugins_Frontend_PilibabaPilipaySystem_Bootstrap extends Shopware
          */
         $this->updateWarehouseList();
 
-
-
         $repository = Shopware()->Models()->getRepository('Shopware\Models\Customer\Customer');
-        $builder = $repository->createQueryBuilder('customer');
+        $builder    = $repository->createQueryBuilder('customer');
         $builder->addFilter(array('email' => 'pilibaba@pilibaba.com'));
         $user = $builder->getQuery()->getOneOrNullResult();
 
-        if(empty($user)) {
+        if (empty($user)) {
 
             /**
              * Adding a pilibaba user
              */
             $repository = Shopware()->Models()->getRepository('Shopware\Models\Payment\Payment');
-            $builder = $repository->getAllPaymentsQueryBuilder(array('p.name' => 'pilipay'));
-            $payment = $builder->getQuery()->getOneOrNullResult();
-            $paymentId = $payment['id'];
+            $builder    = $repository->getAllPaymentsQueryBuilder(array('p.name' => 'pilipay'));
+            $payment    = $builder->getQuery()->getOneOrNullResult();
+            $paymentId  = $payment['id'];
 
-            $sql = "
-INSERT INTO `s_user` ( `password`, `encoder`, `email`, `active`, `accountmode`, `confirmationkey`, `paymentID`, `firstlogin`, `lastlogin`, `sessionID`, `newsletter`, `validation`, `affiliate`, `customergroup`, `paymentpreset`, `language`, `subshopID`, `referer`, `pricegroupID`, `internalcomment`, `failedlogins`, `lockeduntil`) VALUES
-('$2y$105ze.VLOrHD/s7JJgj2MeJZVKfyZwiqDxCC', 'bcrypt', 'pilibaba@pilibaba.com', 1, 0, '', $paymentId, '2015-07-15', '2015-07-15 13:31:54', '', 0, '0', 0, 'EK', 8, '1', 1, '', NULL, '', 0, NULL);
-";
+            $sql = "INSERT INTO `s_user` ( `password`, `encoder`, `email`, `active`, `accountmode`, `confirmationkey`, `paymentID`, `firstlogin`, `lastlogin`, `sessionID`, `newsletter`, `validation`, `affiliate`, `customergroup`, `paymentpreset`, `language`, `subshopID`, `referer`, `pricegroupID`, `internalcomment`, `failedlogins`, `lockeduntil`) 
+                    VALUES
+                    ('$2y$105ze.VLOrHD/s7JJgj2MeJZVKfyZwiqDxCC', 'bcrypt', 'pilibaba@pilibaba.com', 1, 0, '', $paymentId, '2015-07-15', '2015-07-15 13:31:54', '', 0, '0', 0, 'EK', 8, '1', 1, '', NULL, '', 0, NULL)
+                    ";
 
             Shopware()->Db()->query($sql);
             $userId = Shopware()->Db()->lastInsertId();
-            $sql = "INSERT INTO `s_user_billingaddress` (`userID`, `company`, `department`, `salutation`, `customernumber`, `firstname`, `lastname`, `street`, `zipcode`, `city`, `phone`, `fax`, `countryID`, `stateID`, `ustid`, `birthday`, `additional_address_line1`, `additional_address_line2`) VALUES
-($userId, '', '', 'mr', '20003', 'Pilibaba', 'Pilibaba', 'Pilibaba', '10000', 'Pilibaba', '', '', 2, NULL, '', NULL, 'Pilibaba', 'Pilibaba');
-";
+
+            $sql = "INSERT INTO `s_user_billingaddress` (`userID`, `company`, `department`, `salutation`, `firstname`, `lastname`, `street`, `zipcode`, `city`, `phone`, `countryID`, `stateID`, `ustid`, `additional_address_line1`, `additional_address_line2`) 
+                    VALUES
+                    ($userId, '', '', 'mr', 'Pilibaba', 'Pilibaba', 'Pilibaba', '10000', 'Pilibaba', '', 2, NULL, '', 'Pilibaba', 'Pilibaba')
+                    ";
+            Shopware()->Db()->query($sql);
+            $billingaddressId = Shopware()->Db()->lastInsertId('s_user_billingaddress');
+
+            $sql = "INSERT INTO `s_user_shippingaddress` (`userID`, `company`, `department`, `salutation`, `firstname`, `lastname`, `street`, `zipcode`, `city`, `countryID`, `stateID`, `additional_address_line1`, `additional_address_line2`) 
+                    VALUES
+                    ($userId, '', '', 'mr', 'Pilibaba', 'Pilibaba', 'Pilibaba', '10000', 'Pilibaba', 2, NULL, 'Pilibaba', 'Pilibaba')
+                    ";
+            Shopware()->Db()->query($sql);
+            $shippingaddressId = Shopware()->Db()->lastInsertId('s_user_shippingaddress');
+
+            $sql = "UPDATE `s_user` 
+                    SET `default_billing_address_id` = $billingaddressId , 
+                    `default_shipping_address_id` = $shippingaddressId
+                    WHERE `id` = $userId";
             Shopware()->Db()->query($sql);
         }
+    }
 
-
+    protected function deleteDemoData()
+    {
+        $builder = Shopware()->Models()->createQueryBuilder();
+        $builder->delete('Shopware\Models\Customer\Customer', 'customer')
+                ->andWhere('customer.email = :email')
+                ->setParameter('email', 'pilibaba@pilibaba.com')
+                ->getQuery()
+                ->execute();
     }
 
     // update the warehouse list
     public function updateWarehouseList()
     {
         $result = file_get_contents(self::PILIBABA_WAREHOUSE_LIST_URL);
-        if (empty($result)) return;
-        $array = json_decode($result, true);
+        if (empty($result)) {
+            return;
+        }
+        $array         = json_decode($result, true);
         $warehouseList = array();
         foreach ($array as $key => $value) {
             $warehouseList[] = array(
-                'id' => $value['id'],
-                'name' => $value['country'].' '.$value['state'].' warehouse',
-                'active' => 0,
+                'id'                => $value['id'],
+                'name'              => $value['country'] . ' ' . $value['state'] . ' warehouse',
+                'active'            => 0,
                 'receiverFirstName' => $value['firstName'],
-                'receiverLastName' => $value['lastName'],
-                'receiverPhone' => $value['tel'],
-                'street' => $value['address'],
-                'addressLine1' => '',
-                'addressLine2' => '',
-                'city' => $value['city'],
-                'zipCode' => $value['zipcode'],
-                'state' => $value['state'],
-                'country' => $value['country'],
-                'countryIsoCode' => $value['iso2CountryCode'],
-                'company' => '',
+                'receiverLastName'  => $value['lastName'],
+                'receiverPhone'     => $value['tel'],
+                'street'            => $value['address'],
+                'addressLine1'      => '',
+                'addressLine2'      => '',
+                'city'              => $value['city'],
+                'zipCode'           => $value['zipcode'],
+                'state'             => $value['state'],
+                'country'           => $value['country'],
+                'countryIsoCode'    => $value['iso2CountryCode'],
+                'company'           => '',
             );
         }
         $sql = "truncate table `pilipay_warehouses`";
         Shopware()->Db()->query($sql);
         $fieldsList = array_keys($warehouseList[0]);
-        $fields = implode(', ', array_map(function($s){ return '`'.$s.'`';}, $fieldsList));
-        $values = implode(', ', array_map(function($warehouse) use ($fieldsList){
-            return "(" . implode(", ", array_map(function($field) use ($warehouse){
-                return "'".strtr($warehouse[$field], array("\\" => "\\\\", "'" => "\\'"))."'";
+        $fields     = implode(', ', array_map(function ($s) { return '`' . $s . '`'; }, $fieldsList));
+        $values     = implode(', ', array_map(function ($warehouse) use ($fieldsList) {
+            return "(" . implode(", ", array_map(function ($field) use ($warehouse) {
+                return "'" . strtr($warehouse[$field], array("\\" => "\\\\", "'" => "\\'")) . "'";
             }, $fieldsList)) . ")";
         }, $warehouseList));
 
@@ -167,10 +189,9 @@ INSERT INTO `s_user` ( `password`, `encoder`, `email`, `active`, `accountmode`, 
         $this->updatePaymentActive(true); // change to true
 
         return array(
-            'success' => true,
+            'success'         => true,
             'invalidateCache' => array('config', 'backend', 'proxy', 'template', 'theme')
         );
-    //    $this->Plugin()->setActive(true);
     }
 
 
@@ -184,9 +205,10 @@ INSERT INTO `s_user` ( `password`, `encoder`, `email`, `active`, `accountmode`, 
 
         $this->deactivateDispatch();
         $this->updatePaymentActive(false);
+        $this->deleteDemoData();
 
         return array(
-            'success' => true,
+            'success'         => true,
             'invalidateCache' => array('config', 'backend', 'proxy', 'template', 'theme')
         );
     }
@@ -203,7 +225,7 @@ INSERT INTO `s_user` ( `password`, `encoder`, `email`, `active`, `accountmode`, 
         $this->updatePaymentActive(true); // change to true
 
         return array(
-            'success' => true,
+            'success'         => true,
             'invalidateCache' => array('config', 'backend', 'proxy', 'frontend')
         );
     }
@@ -224,7 +246,7 @@ INSERT INTO `s_user` ( `password`, `encoder`, `email`, `active`, `accountmode`, 
 
     /**
      * Deactivation of the payment methode
-     * 
+     *
      * @return array
      */
     public function disable()
@@ -233,7 +255,7 @@ INSERT INTO `s_user` ( `password`, `encoder`, `email`, `active`, `accountmode`, 
         $this->updatePaymentActive(false);
 
         return array(
-            'success' => true,
+            'success'         => true,
             'invalidateCache' => array('config', 'backend')
         );
     }
@@ -247,67 +269,67 @@ INSERT INTO `s_user` ( `password`, `encoder`, `email`, `active`, `accountmode`, 
         $form = $this->Form();
 
         $form->setElement('text', 'merchantNo', array(
-            'label' => 'Merchant No',
-            'scope' => \Shopware\Models\Config\Element::SCOPE_SHOP,
+            'label'       => 'Merchant No',
+            'scope'       => \Shopware\Models\Config\Element::SCOPE_SHOP,
             'description' => 'Register in www.pilibaba.com.you can get this number from your account info page.',
-            'required' => true,
-            'value' => ''
+            'required'    => true,
+            'value'       => ''
         ));
 
         $form->setElement('text', 'appSecrect', array(
-            'label' => 'Merchant account secrect',
-            'scope' => \Shopware\Models\Config\Element::SCOPE_SHOP,
+            'label'       => 'Merchant account secrect',
+            'scope'       => \Shopware\Models\Config\Element::SCOPE_SHOP,
             'description' => 'Register in www.pilibaba.com.you can get this secrect number from your account info page.',
-            'required' => true,
-            'value' => ''
+            'required'    => true,
+            'value'       => ''
         ));
 
         $form->setElement('text', 'updateTrackNumber', array(
-            'label' => 'Update track number link',
-            'scope' => \Shopware\Models\Config\Element::SCOPE_SHOP,
+            'label'       => 'Update track number link',
+            'scope'       => \Shopware\Models\Config\Element::SCOPE_SHOP,
             'description' => 'Update track number',
-            'required' => true,
-            'value' => 'https://www.pilibaba.com/pilipay/updateTrackNo'
+            'required'    => true,
+            'value'       => 'https://www.pilibaba.com/pilipay/updateTrackNo'
         ));
 
         $form->setElement('text', 'accessUrl', array(
-            'label' => 'Access URL',
-            'scope' => \Shopware\Models\Config\Element::SCOPE_SHOP,
+            'label'       => 'Access URL',
+            'scope'       => \Shopware\Models\Config\Element::SCOPE_SHOP,
             'description' => 'Access URL',
-            'required' => true,
-            'value' => 'https://www.pilibaba.com/pilipay/payreq'
+            'required'    => true,
+            'value'       => 'https://www.pilibaba.com/pilipay/payreq'
         ));
 
         $form->setElement('checkbox', 'allowGuestCheckout', array(
-            'label' => 'Allow Guest Checkout',
-            'scope' => \Shopware\Models\Config\Element::SCOPE_SHOP,
+            'label'       => 'Allow Guest Checkout',
+            'scope'       => \Shopware\Models\Config\Element::SCOPE_SHOP,
             'description' => 'Enable it if you want to allow customers checkout when they have not logged in',
-            'required' => false,
-            'value' => ''
+            'required'    => false,
+            'value'       => ''
         ));
 
         $form->setElement('text', 'fixedTax', array(
-            'label' => 'Fixed Tax',
-            'scope' => \Shopware\Models\Config\Element::SCOPE_SHOP,
+            'label'       => 'Fixed Tax',
+            'scope'       => \Shopware\Models\Config\Element::SCOPE_SHOP,
             'description' => 'The fixed tax',
-            'required' => false,
-            'value' => ''
+            'required'    => false,
+            'value'       => ''
         ));
 
         $form->setElement('checkbox', 'useHttps', array(
-            'label' => 'Use HTTPS',
-            'scope' => \Shopware\Models\Config\Element::SCOPE_SHOP,
+            'label'       => 'Use HTTPS',
+            'scope'       => \Shopware\Models\Config\Element::SCOPE_SHOP,
             'description' => 'Enable it if you want to use HTTPS',
-            'required' => false,
-            'value' => true
+            'required'    => false,
+            'value'       => true
         ));
 
         $form->setElement('text', 'shippingName', array(
-            'label' => 'Shipping Name',
-            'scope' => \Shopware\Models\Config\Element::SCOPE_SHOP,
+            'label'       => 'Shipping Name',
+            'scope'       => \Shopware\Models\Config\Element::SCOPE_SHOP,
             'description' => 'The name of the shipping to Pilibaba\'s warehouse. Leave it blank if you want to use the default shipping "Pilipay shipping" which is created autometically',
-            'required' => false,
-            'value' => ''
+            'required'    => false,
+            'value'       => ''
         ));
     }
 
@@ -322,11 +344,11 @@ INSERT INTO `s_user` ( `password`, `encoder`, `email`, `active`, `accountmode`, 
         }
 
         $this->createPayment(array(
-            'name' => self::PAYMENT_NAME,
-            'description' => 'Pilipay',
-            'action' => 'paymentpilipay/payment',
-            'active' => 1,
-            'position' => 0,
+            'name'                  => self::PAYMENT_NAME,
+            'description'           => 'Pilipay',
+            'action'                => 'paymentpilipay/payment',
+            'active'                => 1,
+            'position'              => 0,
             'additionalDescription' => '<img src="//api.pilibaba.com/static/img/btn/for-shopware.png" alt="Pilibaba支付, 人民币支付, 直邮中国" style="height: 4rem;">',
         ));
 
@@ -344,7 +366,11 @@ INSERT INTO `s_user` ( `password`, `encoder`, `email`, `active`, `accountmode`, 
      */
     public function getCountryFirst()
     {
-        return Shopware()->Models()->getRepository('Shopware\Models\Country\Country')->getCountriesQuery()->getArrayResult();
+        return Shopware()
+            ->Models()
+            ->getRepository('Shopware\Models\Country\Country')
+            ->getCountriesQuery()
+            ->getArrayResult();
     }
 
     /**
@@ -354,13 +380,13 @@ INSERT INTO `s_user` ( `password`, `encoder`, `email`, `active`, `accountmode`, 
     {
         /* @var DispatchAttribute $dispatchAttribute */
         $dispatchAttribute = Shopware()->Models()->getRepository('Shopware\Models\Attribute\Dispatch')
-            ->findOneBy(array('swagPilipayDispatch' => 1));
-        $dispatchModel = null;
+                                       ->findOneBy(array('swagPilipayDispatch' => 1));
+        $dispatchModel     = null;
         if ($dispatchAttribute) {
             $dispatchModel = $dispatchAttribute->getDispatch();
         }
 
-        if (!$dispatchModel) {
+        if ( ! $dispatchModel) {
             $dispatchModel = new Dispatch();
             $dispatchModel->setType(0);
             $dispatchModel->setName('Pilipay shipping');
@@ -374,7 +400,7 @@ INSERT INTO `s_user` ( `password`, `encoder`, `email`, `active`, `accountmode`, 
             $dispatchModel->setTaxCalculation(0);
             $dispatchModel->setBindLastStock(0);
             $dispatchModel->setBindShippingFree(0);
-            
+
             // Convert the countries to there country models
             $countries = $this->getCountryFirst();
             foreach ($countries as $country) {
@@ -400,7 +426,7 @@ INSERT INTO `s_user` ( `password`, `encoder`, `email`, `active`, `accountmode`, 
         $shippingCosts = Shopware()->Models()->getRepository('Shopware\Models\Dispatch\ShippingCost')->findBy(
             array('dispatchId' => $dispatchModel->getId())
         );
-        if (!$shippingCosts) {
+        if ( ! $shippingCosts) {
             $shippingCost = new ShippingCost();
             $shippingCost->setFrom('0');
             $shippingCost->setValue(0);
@@ -498,20 +524,21 @@ INSERT INTO `s_user` ( `password`, `encoder`, `email`, `active`, `accountmode`, 
 
     /**
      * Sending of Track Number to pilibaba after saving order in backend
-     * 
+     *
      * @param Enlight_Hook_HookArgs $arguments
+     *
      * @return boolean
      */
     public function ShopwareControllersBackendOrderSaveActionAfter(Enlight_Hook_HookArgs $arguments)
     {
         $controller = $arguments->getSubject();
-        $request = $controller->Request()->getParams();
+        $request    = $controller->Request()->getParams();
 
         $config = $this->get('plugins')->Frontend()->PilibabaPilipaySystem()->Config();
 
         if (isset($request)) {
             if (isset($request['paymentId']) && $this->Payment()->getId() == $request['paymentId'] &&
-                isset($request['trackingCode']) && !empty($request['trackingCode'])
+                isset($request['trackingCode']) && ! empty($request['trackingCode'])
             ) {
                 $logisticsNo = $request['trackingCode'];
 
@@ -519,11 +546,11 @@ INSERT INTO `s_user` ( `password`, `encoder`, `email`, `active`, `accountmode`, 
 
                 $params = array(
                     //Order number is created by the system payment API
-                    'orderNo' => $orderNo,
+                    'orderNo'     => $orderNo,
                     //You send parcels,express company gives your track number,you should give to me.
                     'logisticsNo' => $logisticsNo,
                     // Register in www.pilibaba.com.you can get this number from your account info page.
-                    'merchantNo' => $config->get('merchantNo')
+                    'merchantNo'  => $config->get('merchantNo')
                 );
 
                 $client = Shopware()->PilipayClient($config);
@@ -578,12 +605,12 @@ INSERT INTO `s_user` ( `password`, `encoder`, `email`, `active`, `accountmode`, 
     {
 
         $this->createMenuItem(array(
-            'label' => 'Pilibaba',
+            'label'      => 'Pilibaba',
             'controller' => 'PilipayWarehouses',
-            'class' => 'sprite-application-block',
-            'action' => 'Index',
-            'active' => 1,
-            'parent' => $this->Menu()->findOneBy('label', 'Marketing')
+            'class'      => 'sprite-application-block',
+            'action'     => 'Index',
+            'active'     => 1,
+            'parent'     => $this->Menu()->findOneBy(['label' => 'Marketing'])
         ));
     }
 
@@ -594,8 +621,11 @@ INSERT INTO `s_user` ( `password`, `encoder`, `email`, `active`, `accountmode`, 
      */
     public function onInitResourcePilipayClient()
     {
-        $this->Application()->Loader()->registerNamespace('Shopware_Components_Pilipay', $this->Path() . 'Components/Pilipay/');
+        $this->Application()
+             ->Loader()
+             ->registerNamespace('Shopware_Components_Pilipay', $this->Path() . 'Components/Pilipay/');
         $client = new Shopware_Components_Pilipay_Client($this->Config());
+
         return $client;
     }
 
@@ -607,6 +637,7 @@ INSERT INTO `s_user` ( `password`, `encoder`, `email`, `active`, `accountmode`, 
     public function onGetControllerPathFrontend()
     {
         $this->registerMyTemplateDir();
+
         return __DIR__ . '/Controllers/Frontend/PaymentPilipay.php';
     }
 
@@ -614,6 +645,7 @@ INSERT INTO `s_user` ( `password`, `encoder`, `email`, `active`, `accountmode`, 
      * Return of the path to a backend controller for an event.
      *
      * @param Enlight_Event_EventArgs $args
+     *
      * @return string
      */
     public function onGetControllerPathBackend(Enlight_Event_EventArgs $args)
@@ -640,14 +672,17 @@ INSERT INTO `s_user` ( `password`, `encoder`, `email`, `active`, `accountmode`, 
 
     /**
      * @param string $name
+     *
      * @return mixed
      */
     public function get($name)
     {
         if (version_compare(Shopware::VERSION, '4.2.0', '<') && Shopware::VERSION != '___VERSION___') {
             $name = ucfirst($name);
+
             return $this->Application()->Bootstrap()->getResource($name);
         }
+
         return parent::get($name);
     }
 
@@ -670,6 +705,7 @@ INSERT INTO `s_user` ( `password`, `encoder`, `email`, `active`, `accountmode`, 
     private function getPluginInformation()
     {
         $filename = __DIR__ . '/plugin.json';
+
         return (file_exists($filename)) ? json_decode(file_get_contents($filename), true) : false;
     }
 
@@ -678,6 +714,7 @@ INSERT INTO `s_user` ( `password`, `encoder`, `email`, `active`, `accountmode`, 
      *
      * @param string $key
      * @param mixed $default
+     *
      * @return mixed
      */
     private function getPluginInformationValue($key, $default = 'is not specified')
@@ -710,15 +747,15 @@ INSERT INTO `s_user` ( `password`, `encoder`, `email`, `active`, `accountmode`, 
     public function getInfo()
     {
         return array(
-            'version' => $this->getVersion(),
-            'label' => $this->getLabel(),
-            'supplier' => 'PILIBABA INTERNATIONAL CO.,LTD.',
+            'version'     => $this->getVersion(),
+            'label'       => $this->getLabel(),
+            'supplier'    => 'PILIBABA INTERNATIONAL CO.,LTD.',
             'description' => file_get_contents(__DIR__ . '/info.txt'),
-            'link' => 'http://www.pilibaba.com',
-            'license' => 'MIT',
-            'author' => 'PILIBABA INTERNATIONAL CO.,LTD. info@pilibaba.com',
-            'copyright' => '(c) PILIBABA INTERNATIONAL CO.,LTD. (http://www.pilibaba.com)',
-            'changes' => '[changelog]',
+            'link'        => 'http://www.pilibaba.com',
+            'license'     => 'MIT',
+            'author'      => 'PILIBABA INTERNATIONAL CO.,LTD. info@pilibaba.com',
+            'copyright'   => '(c) PILIBABA INTERNATIONAL CO.,LTD. (http://www.pilibaba.com)',
+            'changes'     => '[changelog]',
         );
     }
 
@@ -729,8 +766,8 @@ INSERT INTO `s_user` ( `password`, `encoder`, `email`, `active`, `accountmode`, 
     {
         return array(
             'install' => true,
-            'enable' => true,
-            'update' => true
+            'enable'  => true,
+            'update'  => true
         );
     }
 
